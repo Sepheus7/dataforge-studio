@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # FastAPI backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dataforge-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # API
+      - API_KEY=${API_KEY:-dev-key}
+      - API_PREFIX=/v1
+      
+      # AWS (use host AWS credentials)
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      
+      # LLM
+      - LLM_PROVIDER=${LLM_PROVIDER:-bedrock}
+      - LLM_MODEL=${LLM_MODEL:-anthropic.claude-3-5-haiku-20241022:0}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.7}
+      
+      # LangSmith
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-true}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-dataforge-studio}
+      
+      # Storage
+      - LOCAL_ARTIFACTS_DIR=/app/artifacts
+      - USE_S3=false
+      
+      # Redis
+      - REDIS_URL=redis://redis:6379
+      - USE_REDIS=true
+      
+      # Spacy
+      - SPACY_MODEL=en_core_web_sm
+      
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./backend/app:/app/app  # For development hot-reload
+    depends_on:
+      - redis
+    networks:
+      - dataforge-network
+    restart: unless-stopped
+  
+  # Redis for caching and session state
+  redis:
+    image: redis:7-alpine
+    container_name: dataforge-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - dataforge-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+  
+  # Optional: Frontend (when implemented)
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: dataforge-frontend
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_API_URL=http://localhost:8000/v1
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - dataforge-network
+  #   restart: unless-stopped
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  dataforge-network:
+    driver: bridge
+

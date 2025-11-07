@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dataforge-config
+  namespace: dataforge
+data:
+  s3-bucket: "dataforge-studio-prod-artifacts"
+  aws-region: "us-east-1"
+  llm-provider: "bedrock"
+  llm-model: "anthropic.claude-3-5-haiku-20241022:0"
+  spacy-model: "en_core_web_sm"
+  log-level: "INFO"
+  max-rows-per-table: "1000000"
+  max-tables: "50"
+  max-columns-per-table: "200"
+

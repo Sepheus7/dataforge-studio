@@ -1,0 +1,76 @@
+name: dataforge-studio
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Python
+  - python=3.11
+  
+  # Core framework
+  - fastapi>=0.115.0
+  - uvicorn>=0.30.0
+  - pydantic>=2.0.0
+  - pip
+  
+  # Data science packages (better via conda)
+  - pandas>=2.3.0
+  - numpy>=2.0.0
+  - scipy>=1.16.0
+  - scikit-learn>=1.7.0
+  
+  # NLP
+  - spacy>=3.7.0
+  
+  # Testing
+  - pytest>=8.0.0
+  - pytest-asyncio>=0.23.0
+  - pytest-cov>=4.1.0
+  
+  # Development tools
+  - black>=24.0.0
+  - ruff>=0.6.0
+  
+  # Pip dependencies (not available in conda)
+  - pip:
+        # Pydantic settings
+        - pydantic-settings>=2.0.0
+        
+        # LangChain/LangGraph (latest stable versions)
+        - langchain>=0.3.0
+        - langchain-aws>=0.2.0
+        - langgraph>=0.2.0
+        - langchain-community>=0.3.0
+        - langchain-core>=0.3.0
+        - langsmith>=0.1.0
+        - langgraph-cli[inmem]
+    
+    
+    # AWS
+    - boto3>=1.40.0
+    - botocore>=1.40.0
+    
+    # Data generation
+    - Faker>=37.0.0
+    - sdv[copula]>=1.26.0
+    
+    # Document generation
+    - python-docx>=1.1.0
+    - pypdf2>=3.0.1
+    - reportlab>=4.2.0
+    - openpyxl>=3.1.2
+    
+    # Streaming
+    - sse-starlette>=2.1.0
+    
+    # OpenAPI parsing
+    - openapi-spec-validator>=0.7.1
+    - prance>=23.6.0
+    
+    # Utilities
+    - python-dotenv>=1.0.0
+    - python-multipart
+    - aiofiles
+    - redis>=5.0.0
+    - httpx>=0.27.0
+    - sqlparse>=0.4.4
+

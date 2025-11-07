@@ -1,0 +1,51 @@
+/* Markdown content styling */
+.prose {
+  color: #1f2937; /* gray-800 */
+}
+
+.prose p {
+  color: #1f2937;
+}
+
+.prose strong {
+  color: #111827; /* gray-900 */
+  font-weight: 600;
+}
+
+.prose code {
+  color: #1f2937;
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.prose pre {
+  background-color: #1f2937;
+  color: #f9fafb;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  color: #111827; /* gray-900 */
+}
+
+.prose ul,
+.prose ol {
+  color: #1f2937;
+}
+
+.prose li {
+  color: #1f2937;
+}
+
+.prose a {
+  color: #2563eb; /* blue-600 */
+}
+
+.prose blockquote {
+  color: #4b5563; /* gray-600 */
+}
+
