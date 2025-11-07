@@ -98,3 +98,10 @@ dump.rdb
 .ipynb_checkpoints/
 *.ipynb
 
+dataforge-studio.code-workspace
+
+# Backend
+backend/artifacts/
+backend/tests/fixtures/
+
+.cursor/
