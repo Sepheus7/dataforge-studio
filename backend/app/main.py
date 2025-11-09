@@ -7,7 +7,7 @@ import logging
 
 from app.core.config import settings
 from app.models.responses import HealthResponse
-from app.api import routes_generation, routes_documents, routes_replication, routes_streaming
+from app.api import routes_generation, routes_documents, routes_replication, routes_streaming, routes_chat
 
 # Configure logging
 logging.basicConfig(
@@ -41,12 +41,14 @@ def create_app() -> FastAPI:
 
     # Include routers
     app.include_router(routes_generation.router, prefix=settings.API_PREFIX, tags=["generation"])
+    app.include_router(routes_chat.router, prefix=settings.API_PREFIX, tags=["chat"])
     app.include_router(routes_documents.router, prefix=settings.API_PREFIX, tags=["documents"])
     app.include_router(routes_replication.router, prefix=settings.API_PREFIX, tags=["replication"])
     app.include_router(routes_streaming.router, prefix=settings.API_PREFIX, tags=["streaming"])
 
-    # Health check endpoint
+    # Health check endpoint (both at root and under API prefix)
     @app.get("/healthz", response_model=HealthResponse)
+    @app.get(f"{settings.API_PREFIX}/healthz", response_model=HealthResponse)
     async def health_check():
         """Health check endpoint"""
         return HealthResponse(

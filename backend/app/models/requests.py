@@ -12,6 +12,7 @@ class PromptRequest(BaseModel):
         default=None, description="Optional hints for number of rows per table"
     )
     seed: Optional[int] = Field(default=None, description="Random seed for reproducible generation")
+    thread_id: Optional[str] = Field(default=None, description="Thread ID for conversation continuity")
 
 
 class SchemaRequest(BaseModel):

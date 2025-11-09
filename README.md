@@ -122,7 +122,7 @@ langgraph dev
 # https://smith.langchain.com/ (if LANGCHAIN_TRACING_V2=true)
 ```
 
-### Frontend Setup (Production UI)
+### Frontend Setup
 
 ```bash
 # Start the frontend
@@ -132,25 +132,11 @@ npm run dev
 # Frontend available at http://localhost:3000
 ```
 
-See **`FRONTEND_SETUP.md`** for complete frontend setup instructions.
-
-### Alternative: LangGraph Studio Chat UI (for agent testing)
-
-```bash
-# Option 1: Use built-in Studio Chat Mode (easiest for development!)
-langgraph studio
-# - Select "chat" graph
-# - Click "Chat" mode
-# - Start chatting with your agent!
-
-# Option 2: Standalone Agent Chat UI
-npx agent-chat-ui --url http://localhost:8123 --graph chat
-
-# Option 3: Custom LangServe chat server
-python backend/chat_server.py
-```
-
-See **`AGENT_CHAT_UI_SETUP.md`** for LangGraph Studio setup instructions.
+The frontend provides:
+- 💬 Conversational chat interface
+- 📊 Real-time progress tracking
+- 📥 Dataset preview and downloads
+- 🔄 Conversation memory across sessions
 
 ## Project Structure
 
@@ -167,16 +153,23 @@ dataforge-studio/
 
 ```bash
 # Run tests
-make test
+cd backend
+pytest tests/ -v
+
+# Run with coverage
+pytest tests/ --cov=app --cov-report=html
 
 # Format code
-make format
+black app/
+isort app/
 
 # Lint
-make lint
+flake8 app/
+mypy app/
 
 # Clean cache
-make clean
+find . -type d -name __pycache__ -exec rm -r {} +
+find . -type f -name "*.pyc" -delete
 ```
 
 ## Deployment
@@ -200,12 +193,28 @@ cd ../k8s
 kubectl apply -f .
 ```
 
+## Testing
+
+Comprehensive test suite covering core capabilities:
+
+```bash
+# Run all tests
+pytest backend/tests/ -v
+
+# Run specific test suite
+pytest backend/tests/test_core_capabilities.py
+
+# Run with coverage
+pytest backend/tests/ --cov=app --cov-report=html
+```
+
+See [backend/tests/README.md](backend/tests/README.md) for test documentation.
+
 ## Documentation
 
-- [Architecture](docs/architecture.md)
-- [Agent Design](docs/agent-design.md)
-- [API Reference](docs/api-reference.md)
-- [Deployment Guide](docs/deployment.md)
+- [Architecture](docs/architecture.md) - System architecture and design
+- [AWS Setup](docs/aws_setup.md) - AWS configuration and credentials
+- [Deployment](docs/deployment.md) - Production deployment guide
 
 ## License
 

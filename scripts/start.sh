@@ -105,10 +105,21 @@ echo ""
 
 # Start Backend
 echo -e "${BLUE}📡 Starting backend on http://localhost:8000${NC}"
-conda run -n dataforge-studio --no-capture-output \
-    uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000 \
+
+# Check if we're already in the conda environment
+if [[ "$CONDA_DEFAULT_ENV" == "dataforge-studio" ]]; then
+    echo "   📦 Using active dataforge-studio environment"
+    cd "$PROJECT_DIR/backend"
+    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 > ../backend.log 2>&1 &
+    BACKEND_PID=$!
+    cd "$PROJECT_DIR"
+else
+    echo "   📦 Activating dataforge-studio environment"
+    conda run -n dataforge-studio --no-capture-output --cwd "$PROJECT_DIR/backend" \
+        uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 \
     > backend.log 2>&1 &
 BACKEND_PID=$!
+fi
 
 # Wait for backend to be ready
 echo "   Waiting for backend to start..."

@@ -2,10 +2,37 @@
 
 import pytest
 import os
+import sys
+import types
 from pathlib import Path
 import tempfile
 import shutil
-from fastapi.testclient import TestClient
+
+# CRITICAL: Mock SDV BEFORE any other imports to prevent binary crash
+# This must happen before importing app.main which imports routes_replication
+_sdv_wrapper_mock = types.ModuleType('app.services.generation.sdv_wrapper')
+_sdv_wrapper_mock.SDV_AVAILABLE = False
+_sdv_wrapper_mock.SDV_ERROR = "SDV disabled in tests due to binary incompatibility"
+
+class _MockSDVReplicator:
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("SDV disabled in tests")
+    
+    def analyze_dataset(self, *args, **kwargs):
+        raise NotImplementedError("SDV disabled in tests")
+    
+    def train_model(self, *args, **kwargs):
+        raise NotImplementedError("SDV disabled in tests")
+
+_sdv_wrapper_mock.SDVReplicator = _MockSDVReplicator
+
+def _mock_get_sdv_replicator():
+    raise NotImplementedError("SDV disabled in tests")
+
+_sdv_wrapper_mock.get_sdv_replicator = _mock_get_sdv_replicator
+
+# Install mock in sys.modules BEFORE any app imports
+sys.modules['app.services.generation.sdv_wrapper'] = _sdv_wrapper_mock
 
 # Set test environment variables
 os.environ["API_KEY"] = "test-api-key"
@@ -13,6 +40,8 @@ os.environ["LANGCHAIN_TRACING_V2"] = "false"  # Disable for tests
 os.environ["USE_S3"] = "false"
 os.environ["USE_REDIS"] = "false"
 
+# Now safe to import app modules (SDV is mocked)
+from fastapi.testclient import TestClient
 from app.main import app
 from app.core.config import settings
 

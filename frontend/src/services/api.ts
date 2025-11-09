@@ -13,6 +13,7 @@ export interface PromptRequest {
   prompt: string;
   size_hint?: Record<string, number>;
   seed?: number;
+  thread_id?: string;
 }
 
 export interface SchemaRequest {
@@ -111,6 +112,14 @@ class DataForgeAPI {
   }
 
   /**
+   * Chat API - Conversational responses without generation
+   */
+  async chat(request: PromptRequest): Promise<{ response: string; thread_id: string; needs_clarification: boolean }> {
+    const response = await this.client.post<{ response: string; thread_id: string; needs_clarification: boolean }>('/chat', request);
+    return response.data;
+  }
+
+  /**
    * Generation API
    */
 
@@ -129,6 +138,11 @@ class DataForgeAPI {
     return response.data;
   }
 
+  async listJobs(): Promise<{ jobs: JobStatusResponse[] }> {
+    const response = await this.client.get<{ jobs: JobStatusResponse[] }>('/generation/list');
+    return response.data;
+  }
+
   async cancelJob(jobId: string): Promise<{ job_id: string; status: string }> {
     const response = await this.client.delete(`/generation/${jobId}`);
     return response.data;
@@ -142,7 +156,8 @@ class DataForgeAPI {
    * Streaming API - Returns EventSource for SSE
    */
   createJobStream(jobId: string): EventSource {
-    return new EventSource(`${API_URL}${API_PREFIX}/generation/${jobId}/stream`);
+    // EventSource can't send custom headers, so pass API key as query param
+    return new EventSource(`${API_URL}${API_PREFIX}/generation/${jobId}/stream?key=${API_KEY}`);
   }
 
   /**

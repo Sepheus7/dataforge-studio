@@ -1,15 +1,20 @@
-"""Agent tools for LangChain/LangGraph agents - Pure LLM reasoning, no heuristics"""
+"""Agent tools for LangChain/LangGraph agents
+- Pure LLM reasoning, no heuristics
+- Uses ChatBedrockConverse for streaming
+"""
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
+import logging
 from langchain_core.tools import tool
-from langchain_aws import ChatBedrock
+from langchain_aws import ChatBedrockConverse  # New Converse API
 from langchain_core.messages import HumanMessage, SystemMessage
 import json
 import asyncio
 import random
-from botocore.exceptions import ClientError
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 async def llm_with_retry(llm, messages, max_retries=5, base_delay=2):
@@ -54,15 +59,12 @@ async def llm_with_retry(llm, messages, max_retries=5, base_delay=2):
 
 
 def get_llm():
-    """Get LLM instance for tool reasoning"""
-    return ChatBedrock(
-        model_id=settings.LLM_MODEL,
+    """Get LLM instance for tool reasoning with ChatBedrockConverse"""
+    return ChatBedrockConverse(
+        model=settings.LLM_MODEL,  # 'model' not 'model_id'
         region_name=settings.AWS_REGION,
-        provider="anthropic",  # Required for Claude models
-        model_kwargs={
-            "temperature": 0.7,
-            "max_tokens": 4096,
-        },
+        temperature=settings.LLM_TEMPERATURE,
+        max_tokens=settings.LLM_MAX_TOKENS,
     )
 
 
@@ -88,7 +90,7 @@ async def analyze_prompt(prompt: str) -> Dict[str, Any]:
 1. ENTITIES: What tables/entities are needed? Think about the business domain.
 2. RELATIONSHIPS: How do these entities relate to each other? (one-to-many, many-to-many, etc.)
 3. DOMAIN: What business domain is this? (e.g., ecommerce, healthcare, finance, marketing)
-4. ROW ESTIMATES: Reasonable default row counts based on the relationships
+4. ROW ESTIMATES: Default to 100 rows per table unless the user specifically requests more. Use reasonable small numbers (100-1000) for typical datasets.
 
 Request: "{prompt}"
 
@@ -101,7 +103,7 @@ Return ONLY a JSON object with this exact structure:
         {{"from": "entity1", "to": "entity2", "type": "many_to_one", "foreign_key": "entity2_id"}}
     ],
     "domain": "domain_name",
-    "size_hints": {{"entity1": 1000, "entity2": 5000}},
+    "size_hints": {{"entity1": 100, "entity2": 100}},
     "reasoning": "Brief explanation of your analysis"
 }}"""
 
@@ -111,27 +113,63 @@ Return ONLY a JSON object with this exact structure:
     ]
 
     response = await llm_with_retry(llm, messages)
+    
+    logger.info(f"🤖 LLM response type: {type(response)}")
+    logger.info(f"🤖 LLM response.content type: {type(response.content)}")
+    logger.info(f"🤖 LLM response.content: {response.content}")
 
     # Parse JSON response
     try:
-        # Extract JSON from response (handle markdown code blocks)
+        # Extract content (ChatBedrockConverse returns list of blocks, ChatBedrock returns string)
         content = response.content
+        if isinstance(content, list):
+            # ChatBedrockConverse format: list of content blocks
+            # Handle different block types: text, reasoning, etc.
+            text_parts = []
+            for block in content:
+                if isinstance(block, dict):
+                    if "text" in block:
+                        text_parts.append(block["text"])
+                    # Skip reasoningContent blocks - we only want the actual response
+                elif isinstance(block, str):
+                    text_parts.append(block)
+                else:
+                    text_parts.append(str(block))
+            content = " ".join(text_parts)
+        
+        logger.info(f"📝 Extracted content: {content[:200]}...")
+        
+        # Extract JSON from response (handle markdown code blocks)
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0]
         elif "```" in content:
             content = content.split("```")[1].split("```")[0]
 
+        logger.info(f"🔍 Parsing JSON content: {content[:200]}...")
         result = json.loads(content.strip())
         result["original_prompt"] = prompt
+        logger.info(f"✅ Successfully parsed analysis: {result.get('entities')}")
         return result
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
         # Fallback: return minimal structure
+        logger.error(f"❌ JSON parsing failed: {e}")
+        logger.error(f"❌ Raw content that failed: {content[:500]}")
         return {
             "entities": ["data"],
             "relationships": [],
             "domain": "generic",
-            "size_hints": {"data": 1000},
+            "size_hints": {"data": 100},
             "reasoning": "Failed to parse LLM response",
+            "original_prompt": prompt,
+        }
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in analyze_prompt: {e}", exc_info=True)
+        return {
+            "entities": ["data"],
+            "relationships": [],
+            "domain": "generic",
+            "size_hints": {"data": 100},
+            "reasoning": f"Error: {str(e)}",
             "original_prompt": prompt,
         }
 
@@ -205,16 +243,30 @@ Return ONLY a JSON array of column objects:
 
     # Parse JSON response
     try:
+        # Extract content (ChatBedrockConverse returns list of blocks)
         content = response.content
+        if isinstance(content, list):
+            # Extract only text blocks, skip reasoning blocks
+            text_parts = []
+            for block in content:
+                if isinstance(block, dict) and "text" in block:
+                    text_parts.append(block["text"])
+                elif isinstance(block, str):
+                    text_parts.append(block)
+            content = " ".join(text_parts)
+        
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0]
         elif "```" in content:
             content = content.split("```")[1].split("```")[0]
 
         columns = json.loads(content.strip())
+        logger.info(f"✅ Successfully suggested {len(columns)} columns for {entity}")
         return columns
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
         # Fallback: minimal structure
+        logger.error(f"❌ JSON parsing failed for suggest_columns({entity}): {e}")
+        logger.error(f"❌ Raw content: {content[:500] if 'content' in locals() else 'N/A'}")
         return [
             {"name": f"{entity.rstrip('s')}_id", "type": "uuid", "unique": True},
             {"name": "name", "type": "string"},
@@ -279,7 +331,18 @@ If no relationships make sense, return an empty array []."""
 
     # Parse JSON response
     try:
+        # Extract content (ChatBedrockConverse returns list of blocks)
         content = response.content
+        if isinstance(content, list):
+            # Extract only text blocks, skip reasoning blocks
+            text_parts = []
+            for block in content:
+                if isinstance(block, dict) and "text" in block:
+                    text_parts.append(block["text"])
+                elif isinstance(block, str):
+                    text_parts.append(block)
+            content = " ".join(text_parts)
+        
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0]
         elif "```" in content:
@@ -413,7 +476,7 @@ def normalize_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
     for table in schema.get("tables", []):
         normalized_table = {
             "name": str(table.get("name", "unnamed")),
-            "rows": int(table.get("rows", 1000)),
+            "rows": int(table.get("rows", 100)),
             "columns": [],
         }
 

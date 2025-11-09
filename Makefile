@@ -54,6 +54,7 @@ clean: ## Clean up cache and temporary files
 	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
 	rm -rf backend/htmlcov
 	rm -rf backend/.coverage
+	rm -rf backend/artifacts/
 	@echo "Cleanup complete!"
 
 conda-clean: ## Remove conda environment

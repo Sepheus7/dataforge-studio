@@ -24,9 +24,7 @@ interface LayoutProps {
 }
 
 const navItems = [
-  { id: 'chat' as const, label: 'Chat', icon: MessageSquare },
-  { id: 'schema' as const, label: 'Schema Editor', icon: Database },
-  { id: 'jobs' as const, label: 'Jobs', icon: Briefcase },
+  { id: 'chat' as const, label: 'Generate', icon: MessageSquare },
   { id: 'downloads' as const, label: 'Downloads', icon: Download },
   { id: 'settings' as const, label: 'Settings', icon: Settings },
 ];
@@ -101,7 +99,7 @@ export default function Layout({ children }: LayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden flex flex-col">
+      <main className="flex-1 overflow-hidden flex flex-col" style={{ minWidth: 0, overflowX: 'hidden' }}>
         {/* Mobile Header */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center px-4 lg:hidden">
           <button
@@ -117,7 +115,7 @@ export default function Layout({ children }: LayoutProps) {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ minWidth: 0 }}>
           {children}
         </div>
       </main>

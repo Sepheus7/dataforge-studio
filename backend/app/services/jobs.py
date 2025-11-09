@@ -188,22 +188,39 @@ class JobManager:
             job_id: Job identifier
             final: Whether this is the final update
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         job = self._jobs.get(job_id)
         if not job:
             return
 
+        has_subs = event_stream.has_subscribers(job_id)
+        logger.info(f"📡 Publishing update for {job_id}: progress={job['progress']:.0%}, has_subscribers={has_subs}")
+        
+        event_data = {
+            "job_id": job_id,
+            "status": job["status"],
+            "progress": job["progress"],
+            "message": job["message"],
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        
+        # Include result in final update (rename summary -> result for frontend)
+        if final and job.get("summary"):
+            event_data["result"] = job["summary"]
+        
+        # Include error if present
+        if job.get("error"):
+            event_data["error"] = job["error"]
+        
         event = StreamEvent(
-            data={
-                "job_id": job_id,
-                "status": job["status"],
-                "progress": job["progress"],
-                "message": job["message"],
-                "timestamp": datetime.utcnow().isoformat(),
-            },
+            data=event_data,
             event="progress",
         )
 
-        await event_stream.publish(job_id, event)
+        sub_count = await event_stream.publish(job_id, event)
+        logger.info(f"📨 Event sent to {sub_count} subscribers (result={'Yes' if event_data.get('result') else 'No'})")
 
         if final:
             await event_stream.close_stream(job_id)

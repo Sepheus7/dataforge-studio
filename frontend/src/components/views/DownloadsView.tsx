@@ -24,7 +24,7 @@ import ClientOnly from '@/components/ClientOnly';
 type FileFilter = 'all' | 'datasets' | 'documents';
 
 export default function DownloadsView() {
-  const { jobs, updateJob } = useAppStore();
+  const { jobs, addJob, updateJob, removeJob } = useAppStore();
   const [filter, setFilter] = useState<FileFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -53,9 +53,33 @@ export default function DownloadsView() {
     return true;
   });
 
-  const handleDownload = (jobId: string, tableName: string, format: string = 'csv') => {
-    const url = api.getDownloadUrl(jobId, tableName, format);
-    window.open(url, '_blank');
+  const handleDownload = async (jobId: string, tableName: string, format: string = 'csv') => {
+    try {
+      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/v1/generation/${jobId}/download?table_name=${tableName}&format=${format}`;
+      
+      const response = await fetch(downloadUrl, {
+        headers: {
+          'X-API-Key': process.env.NEXT_PUBLIC_API_KEY || 'dev-key'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${tableName}_${jobId}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const handleDownloadAll = async (jobId: string) => {
@@ -72,16 +96,61 @@ export default function DownloadsView() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all(
-        completedJobs.map(async (job) => {
-          try {
-            const status = await api.getJobStatus(job.job_id);
-            updateJob(job.job_id, status);
-          } catch (error) {
-            console.error(`Failed to refresh job ${job.job_id}:`, error);
-          }
-        })
-      );
+      // First, discover all jobs from artifacts directory
+      console.log('🔍 Discovering jobs from artifacts...');
+      try {
+        const { jobs: discoveredJobs } = await api.listJobs();
+        console.log(`📦 Discovered ${discoveredJobs.length} jobs from artifacts`);
+        
+        // Add or update jobs in store
+        if (discoveredJobs && Array.isArray(discoveredJobs)) {
+          discoveredJobs.forEach((job) => {
+            if (job && job.job_id) {
+              if (jobs[job.job_id]) {
+                // Job exists, update it
+                updateJob(job.job_id, job);
+              } else {
+                // New job, add it
+                addJob(job);
+              }
+            }
+          });
+        }
+      } catch (error: any) {
+        console.error('❌ Failed to discover jobs:', error);
+        // Don't throw - continue with refresh even if discovery fails
+        // This allows the view to still show jobs that are in the store
+      }
+
+      // Then refresh jobs from store (only if they exist in memory)
+      // Skip this step if we just discovered jobs from artifacts, as they
+      // might not be in backend memory yet
+      const allJobs = Object.values(jobs).filter(job => job && job.job_id);
+      console.log(`🔄 Refreshing ${allJobs.length} jobs from store...`);
+      
+      if (allJobs.length > 0) {
+        await Promise.allSettled(
+          allJobs.map(async (job) => {
+            if (!job.job_id) {
+              return;
+            }
+            
+            try {
+              const status = await api.getJobStatus(job.job_id);
+              console.log(`✅ Refreshed job ${job.job_id}:`, status);
+              updateJob(job.job_id, status);
+            } catch (error: any) {
+              // If job not found (404), it's okay - it might be from artifacts
+              // and not in backend memory. Just log it, don't show error.
+              if (error?.statusCode === 404 || error?.message?.includes('not found')) {
+                console.debug(`Job ${job.job_id} not in backend memory (from artifacts)`);
+              } else {
+                console.warn(`⚠️ Failed to refresh job ${job.job_id}:`, error);
+              }
+            }
+          })
+        );
+      }
     } finally {
       setRefreshing(false);
     }
@@ -96,8 +165,14 @@ export default function DownloadsView() {
     return sum + (job.result?.total_rows || 0);
   }, 0);
 
+  // Auto-refresh on mount to discover and fetch latest job status
+  useEffect(() => {
+    console.log('🔄 Auto-discovering jobs on mount...');
+    handleRefresh();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gray-50" style={{ overflowX: 'hidden', width: '100%', maxWidth: '100%' }}>
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between mb-4">
@@ -109,11 +184,11 @@ export default function DownloadsView() {
           </div>
           <button
             onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
+            disabled={refreshing || Object.keys(jobs).length === 0}
+            className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
+            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
         </div>
 
@@ -184,7 +259,7 @@ export default function DownloadsView() {
       </div>
 
       {/* Files List */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-6">
         {filteredJobs.length === 0 ? (
           <div className="text-center py-12">
             <FileSpreadsheet className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -203,6 +278,7 @@ export default function DownloadsView() {
               <div
                 key={job.job_id}
                 className="bg-white rounded-lg border border-gray-200 p-6 hover:border-primary-300 transition-colors"
+                style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}
               >
                 {/* Job Header */}
                 <div className="flex items-start justify-between mb-4">
@@ -257,6 +333,7 @@ export default function DownloadsView() {
                       <div
                         key={idx}
                         className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                        style={{ width: '100%', maxWidth: '100%', minWidth: 0 }}
                       >
                         <div className="flex items-center space-x-3 flex-1">
                           <FileSpreadsheet className="w-5 h-5 text-gray-600" />

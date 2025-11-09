@@ -22,9 +22,22 @@ export default function TimeDisplay({ timestamp, className = '' }: TimeDisplayPr
     return <span className={className}>&nbsp;</span>;
   }
 
+  // Handle undefined or invalid timestamp
+  if (!timestamp) {
+    return <span className={className}>&nbsp;</span>;
+  }
+
+  // Convert string to Date if needed
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return <span className={className}>&nbsp;</span>;
+  }
+
   return (
     <span className={className}>
-      {timestamp.toLocaleTimeString()}
+      {date.toLocaleTimeString()}
     </span>
   );
 }

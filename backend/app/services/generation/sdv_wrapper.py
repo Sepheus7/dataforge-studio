@@ -2,14 +2,29 @@
 
 from typing import Dict, Any, Optional, List
 import pandas as pd
-from sdv.single_table import GaussianCopulaSynthesizer, CTGANSynthesizer
-from sdv.metadata import SingleTableMetadata
-from sdv.multi_table import HMASynthesizer
-from sdv.metadata import MultiTableMetadata
-from sdv.evaluation.single_table import evaluate_quality
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Try to import SDV, make it optional due to binary compatibility issues
+try:
+    from sdv.single_table import GaussianCopulaSynthesizer, CTGANSynthesizer
+    from sdv.metadata import SingleTableMetadata
+    from sdv.multi_table import HMASynthesizer
+    from sdv.metadata import MultiTableMetadata
+    from sdv.evaluation.single_table import evaluate_quality
+    SDV_AVAILABLE = True
+except (ImportError, SystemError, OSError) as e:
+    SDV_AVAILABLE = False
+    SDV_ERROR = str(e)
+    logger.warning(f"SDV not available: {SDV_ERROR}. Dataset replication features will be disabled.")
+    # Create dummy classes to prevent import errors
+    GaussianCopulaSynthesizer = None
+    CTGANSynthesizer = None
+    SingleTableMetadata = None
+    HMASynthesizer = None
+    MultiTableMetadata = None
+    evaluate_quality = None
 
 
 class SDVReplicator:
@@ -141,6 +156,9 @@ class SDVReplicator:
         Returns:
             Model ID
         """
+        if not SDV_AVAILABLE:
+            raise NotImplementedError(f"SDV not available: {SDV_ERROR}. Please use prompt-based generation instead.")
+        
         # Create metadata
         metadata = SingleTableMetadata()
         metadata.detect_from_dataframe(df)
@@ -199,6 +217,9 @@ class SDVReplicator:
         Returns:
             Quality metrics
         """
+        if not SDV_AVAILABLE:
+            raise NotImplementedError(f"SDV not available: {SDV_ERROR}. Please use prompt-based generation instead.")
+        
         metadata = SingleTableMetadata()
         metadata.detect_from_dataframe(real_data)
 
@@ -225,6 +246,9 @@ class SDVReplicator:
         Returns:
             Model ID
         """
+        if not SDV_AVAILABLE:
+            raise NotImplementedError(f"SDV not available: {SDV_ERROR}. Please use prompt-based generation instead.")
+        
         # Create metadata
         metadata = MultiTableMetadata()
 

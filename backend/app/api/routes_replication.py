@@ -1,7 +1,6 @@
 """API routes for dataset replication"""
 
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, BackgroundTasks
-from fastapi.responses import FileResponse
 import pandas as pd
 import logging
 import uuid
@@ -12,10 +11,18 @@ from app.core.config import settings
 from app.models.requests import ReplicationConfig
 from app.models.responses import JobResponse, DatasetProfile, JobStatus
 from app.services.jobs import get_job_manager
-from app.services.generation.sdv_wrapper import get_sdv_replicator
 from app.services.pii.detector import get_pii_detector
 from app.services.pii.replacer import get_pii_replacer
 from app.agents.replication_agent import get_replication_agent
+
+# Lazy import SDV to avoid crashes during module import
+def get_sdv_replicator():
+    """Lazy import SDV to avoid crashes during module import"""
+    try:
+        from app.services.generation.sdv_wrapper import get_sdv_replicator as _get_sdv
+        return _get_sdv()
+    except (ImportError, SystemError, OSError, Exception):
+        raise NotImplementedError("SDV temporarily disabled - use prompt-based generation instead")
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

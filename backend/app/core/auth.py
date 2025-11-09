@@ -58,3 +58,40 @@ async def optional_api_key(api_key: Optional[str] = Security(api_key_header)) ->
         return await verify_api_key(api_key)
     except HTTPException:
         return None
+
+
+async def verify_api_key_query(
+    api_key_header: Optional[str] = Security(api_key_header),
+    api_key_query: Optional[str] = None
+) -> str:
+    """
+    Verify API key from either header or query parameter.
+    
+    This is useful for SSE endpoints where EventSource can't send custom headers.
+
+    Args:
+        api_key_header: API key from X-API-Key header
+        api_key_query: API key from query parameter
+
+    Returns:
+        The verified API key
+
+    Raises:
+        HTTPException: If API key is missing or invalid
+    """
+    api_key = api_key_header or api_key_query
+    
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing API key. Include X-API-Key header or ?key= query parameter.",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+    if api_key != settings.API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid API key",
+        )
+
+    return api_key

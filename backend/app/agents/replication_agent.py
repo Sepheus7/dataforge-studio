@@ -1,7 +1,7 @@
 """Dataset Replication Agent for synthetic data generation from existing datasets"""
 
 from typing import Dict, Any, Optional, List
-from langchain_aws import ChatBedrock
+from langchain_aws import ChatBedrockConverse  # New Converse API
 from langchain_core.messages import HumanMessage, SystemMessage
 import pandas as pd
 
@@ -19,15 +19,13 @@ class ReplicationAgent:
         """Initialize the replication agent"""
         self.llm = self._create_llm()
 
-    def _create_llm(self) -> ChatBedrock:
-        """Create LLM instance"""
-        return ChatBedrock(
-            model_id=settings.LLM_MODEL,
+    def _create_llm(self) -> ChatBedrockConverse:
+        """Create LLM instance with ChatBedrockConverse"""
+        return ChatBedrockConverse(
+            model=settings.LLM_MODEL,  # 'model' not 'model_id'
             region_name=settings.AWS_REGION,
-            model_kwargs={
-                "temperature": 0.3,  # Lower temperature for more consistent analysis
-                "max_tokens": 4096,
-            },
+            temperature=settings.LLM_TEMPERATURE,  # Lower temperature for more consistent analysis
+            max_tokens=settings.LLM_MAX_TOKENS,
         )
 
     async def analyze_dataset_structure(self, df: pd.DataFrame, table_name: str) -> Dict[str, Any]:

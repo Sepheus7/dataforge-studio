@@ -38,5 +38,14 @@ echo ""
 
 # Start the backend
 cd "$PROJECT_ROOT"
-conda run -n dataforge-studio --no-capture-output uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Check if we're already in the conda environment
+if [[ "$CONDA_DEFAULT_ENV" == "dataforge-studio" ]]; then
+    echo "📦 Already in dataforge-studio environment"
+    cd backend
+    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+else
+    echo "📦 Activating dataforge-studio environment"
+    conda run -n dataforge-studio --no-capture-output --cwd "$PROJECT_ROOT/backend" uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+fi
 

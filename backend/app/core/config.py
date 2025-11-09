@@ -1,14 +1,27 @@
 """Application configuration using pydantic-settings"""
 
 from typing import Optional
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Get the project root directory (4 levels up from config.py)
+# __file__ = .../backend/app/core/config.py
+# .parent → app/core
+# .parent → app  
+# .parent → backend
+# .parent → PROJECT ROOT
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+ENV_FILE = PROJECT_ROOT / ".env"
 
 
 class Settings(BaseSettings):
     """Application settings with environment variable support"""
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="allow"
+        env_file=str(ENV_FILE),
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="allow"
     )
 
     # API Configuration
@@ -24,10 +37,14 @@ class Settings(BaseSettings):
     BEDROCK_AGENT_ID: Optional[str] = None
     BEDROCK_AGENT_ALIAS_ID: Optional[str] = None
 
-    # LLM Configuration - Claude Haiku 4.5 for optimal performance/cost
+    # LLM Configuration - Claude models
     LLM_PROVIDER: str = "bedrock"  # bedrock, openai, anthropic
-    LLM_MODEL: str = "anthropic.claude-haiku-4-5-20251001-v1:0"
-    LLM_TEMPERATURE: float = 0.7
+    # Options:
+    # - "us.anthropic.claude-3-5-sonnet-20241022-v2:0" (cross-region inference profile)
+    # - "anthropic.claude-3-5-sonnet-20241022-v2:0" (direct model access)
+    # - "anthropic.claude-3-haiku-20240307-v1:0" (Claude 3 Haiku - cheaper)
+    LLM_MODEL: str = "arn:aws:bedrock:us-east-1:842676020002:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    LLM_TEMPERATURE: float = 0.2
     LLM_MAX_TOKENS: int = 4096
     LLM_STREAMING: bool = True
 

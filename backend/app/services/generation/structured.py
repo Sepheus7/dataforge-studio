@@ -4,13 +4,14 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 import json
 import random
-import csv
 from faker import Faker
 from datetime import datetime, timedelta
 import asyncio
 
 from app.core.config import settings
 from app.services.jobs import get_job_manager
+import logging
+logger = logging.getLogger(__name__)
 
 
 class StructuredDataGenerator:
@@ -51,7 +52,9 @@ class StructuredDataGenerator:
         Returns:
             Summary of generated data
         """
+        logger.info(f"🔧 generate_from_schema called for job {job_id}")
         job_dir = self._job_dir(job_id)
+        logger.info(f"📁 Job directory: {job_dir}")
         faker = Faker()
 
         # Set up seed
@@ -63,24 +66,35 @@ class StructuredDataGenerator:
         # Save schema
         schema_path = job_dir / "schema.json"
         schema_path.write_text(json.dumps(schema, indent=2))
+        logger.info(f"💾 Schema saved to {schema_path}")
 
         tables = schema.get("tables", [])
+        logger.info(f"📊 Found {len(tables)} tables to generate")
         summary_tables = []
         pk_values: Dict[str, List[str]] = {}
 
         total_tables = len(tables)
 
         for table_idx, table in enumerate(tables):
-            # Update progress
-            progress = table_idx / total_tables
+            logger.info(f"🔨 Generating table {table_idx + 1}/{total_tables}: {table.get('name', 'unknown')}")
+            # Update progress (map data generation to 95-100% range)
+            # Schema inference uses 0-95%, data generation uses 95-100%
+            table_progress = table_idx / total_tables if total_tables > 0 else 0
+            progress = 0.95 + (0.05 * table_progress)
             self.job_manager.update_progress(
                 job_id,
                 progress,
-                f"Generating table {table_idx + 1}/{total_tables}: {table['name']}",
+                f"📊 Generating table {table_idx + 1}/{total_tables}: {table['name']}",
             )
 
             table_summary = await self._generate_table(
-                table=table, job_dir=job_dir, faker=faker, pk_values=pk_values
+                table=table, 
+                job_dir=job_dir, 
+                faker=faker, 
+                pk_values=pk_values,
+                job_id=job_id,
+                table_idx=table_idx,
+                total_tables=total_tables
             )
 
             summary_tables.append(table_summary)
@@ -97,7 +111,14 @@ class StructuredDataGenerator:
         return summary
 
     async def _generate_table(
-        self, table: Dict[str, Any], job_dir: Path, faker: Faker, pk_values: Dict[str, List[str]]
+        self, 
+        table: Dict[str, Any], 
+        job_dir: Path, 
+        faker: Faker, 
+        pk_values: Dict[str, List[str]],
+        job_id: str,
+        table_idx: int,
+        total_tables: int
     ) -> Dict[str, Any]:
         """
         Generate a single table.
@@ -167,7 +188,10 @@ class StructuredDataGenerator:
             base_price = None
             drift = None
 
-        # Generate rows
+        # Generate rows with progress updates
+        chunk_size = max(10000, rows // 20)  # Update every 10k rows or 5% progress, whichever is larger
+        last_progress_update = 0
+        
         for i in range(rows):
             values = []
             derived_row: Dict[str, Any] = {}
@@ -204,9 +228,24 @@ class StructuredDataGenerator:
             with open(csv_path, "a", newline="") as f:
                 f.write(",".join(values) + "\n")
 
-            # Yield control periodically
-            if i % 1000 == 0:
+            # Update progress periodically during generation
+            if i > 0 and (i - last_progress_update) >= chunk_size:
+                # Calculate progress within this table (0-1)
+                table_internal_progress = i / rows
+                # Map to overall progress (95-100% range)
+                # Each table gets 5% / total_tables of the 95-100% range
+                table_base_progress = table_idx / total_tables if total_tables > 0 else 0
+                table_range_progress = (table_idx + table_internal_progress) / total_tables if total_tables > 0 else 0
+                overall_progress = 0.95 + (0.05 * table_range_progress)
+                
+                # Update progress
+                self.job_manager.update_progress(
+                    job_id,
+                    overall_progress,
+                    f"📊 Generating table {table_idx + 1}/{total_tables}: {table['name']} ({i:,}/{rows:,} rows)",
+                )
                 await asyncio.sleep(0)
+                last_progress_update = i
 
         # Store PK values for FK references
         if generated_pk_values:

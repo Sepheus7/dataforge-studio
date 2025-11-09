@@ -1,7 +1,7 @@
 """Document Generation Agent - Fully LLM-driven, no templates"""
 
 from typing import Dict, Any, Optional
-from langchain_aws import ChatBedrock
+from langchain_aws import ChatBedrockConverse  # New Converse API
 from langchain_core.messages import HumanMessage, SystemMessage
 import json
 
@@ -26,16 +26,13 @@ class DocumentAgent:
         """Initialize the document agent"""
         self.llm = self._create_llm()
 
-    def _create_llm(self) -> ChatBedrock:
-        """Create LLM instance with higher token limit for document generation"""
-        return ChatBedrock(
-            model_id=settings.LLM_MODEL,
+    def _create_llm(self) -> ChatBedrockConverse:
+        """Create LLM instance with ChatBedrockConverse for better streaming"""
+        return ChatBedrockConverse(
+            model=settings.LLM_MODEL,  # 'model' not 'model_id'
             region_name=settings.AWS_REGION,
-            provider="anthropic",  # Required for Claude models
-            model_kwargs={
-                "temperature": 0.9,  # Higher for more creative generation
-                "max_tokens": 8192,  # More tokens for longer documents
-            },
+            temperature=settings.LLM_TEMPERATURE,  # Higher for more creative generation
+            max_tokens=settings.LLM_MAX_TOKENS,  # More tokens for longer documents
         )
 
     async def generate_text_document(
@@ -108,7 +105,9 @@ Generate the complete document now:"""
         return response.content.strip()
 
     async def generate_structured_document(
-        self, document_type: str, context: Dict[str, Any], language: str = "english"
+        self, document_type: str,
+        context: Dict[str, Any],
+        language: str = "english"
     ) -> Dict[str, str]:
         """
         Generate a structured document (like invoice or contract) using LLM reasoning.
