@@ -19,7 +19,7 @@ node --version
 Open a terminal and run:
 
 ```bash
-cd /Users/romainboluda/Documents/PersonalProjects/dataforge-studio
+cd /path/to/dataforge-studio
 
 # Activate the conda environment first
 conda activate dataforge-studio
@@ -144,7 +144,7 @@ If the scripts don't work, start manually:
 ### Backend
 
 ```bash
-cd /Users/romainboluda/Documents/PersonalProjects/dataforge-studio
+cd /path/to/dataforge-studio
 conda activate dataforge-studio
 cd backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -153,7 +153,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ### Frontend
 
 ```bash
-cd /Users/romainboluda/Documents/PersonalProjects/dataforge-studio/frontend
+cd /path/to/dataforge-studio/frontend
 npm run dev
 ```
 
