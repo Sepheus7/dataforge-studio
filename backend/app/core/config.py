@@ -24,6 +24,19 @@ class Settings(BaseSettings):
         extra="allow"
     )
 
+    # Environment: "development" | "staging" | "production"
+    ENVIRONMENT: str = "development"
+
+    # JWT Authentication (set ENABLE_JWT_AUTH=true to require Bearer tokens)
+    ENABLE_JWT_AUTH: bool = False
+    JWT_SECRET_KEY: Optional[str] = None  # Must be set when ENABLE_JWT_AUTH=true
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
+    # Rate Limiting
+    RATE_LIMIT_ENABLED: bool = False  # Set to true in production
+    RATE_LIMIT_DEFAULT: str = "60/minute"
+    RATE_LIMIT_GENERATION: str = "10/minute"
+
     # API Configuration
     API_KEY: str = "dev-key"
     API_PREFIX: str = "/v1"
@@ -80,9 +93,12 @@ class Settings(BaseSettings):
     PII_DETECTION_ENABLED: bool = True
 
     # CORS Configuration
-    CORS_ORIGINS: list[str] = ["*"]
+    # In production set CORS_ORIGINS to your actual frontend URL(s), e.g.:
+    #   CORS_ORIGINS=["https://app.yourdomain.com"]
+    # Wildcard ("*") is only acceptable for local development.
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     CORS_ALLOW_CREDENTIALS: bool = True
-    CORS_ALLOW_METHODS: list[str] = ["*"]
+    CORS_ALLOW_METHODS: list[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     CORS_ALLOW_HEADERS: list[str] = ["*"]
 
     # Logging
@@ -97,7 +113,7 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         """Check if running in production mode"""
-        return self.USE_S3 and self.USE_REDIS
+        return self.ENVIRONMENT == "production"
 
 
 # Global settings instance

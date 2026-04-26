@@ -4,6 +4,11 @@ uvicorn[standard]>=0.30.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 
+# Authentication
+python-jose[cryptography]>=3.3.0  # JWT token signing
+passlib[bcrypt]>=1.7.4            # Password hashing (for future user management)
+slowapi>=0.1.9                    # Rate limiting
+
 # LangChain/LangGraph (>= 1.0 for robustness)
 langchain>=1.0.0
 langchain-aws>=1.0.0

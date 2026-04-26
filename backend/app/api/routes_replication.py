@@ -15,17 +15,34 @@ from app.services.pii.detector import get_pii_detector
 from app.services.pii.replacer import get_pii_replacer
 from app.agents.replication_agent import get_replication_agent
 
-# Lazy import SDV to avoid crashes during module import
-def get_sdv_replicator():
-    """Lazy import SDV to avoid crashes during module import"""
-    try:
-        from app.services.generation.sdv_wrapper import get_sdv_replicator as _get_sdv
-        return _get_sdv()
-    except (ImportError, SystemError, OSError, Exception):
-        raise NotImplementedError("SDV temporarily disabled - use prompt-based generation instead")
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def get_sdv_replicator():
+    """Lazy import SDV; raises 503 if unavailable."""
+    try:
+        from app.services.generation.sdv_wrapper import get_sdv_replicator as _get_sdv, SDV_AVAILABLE
+        if not SDV_AVAILABLE:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Dataset replication (SDV) is temporarily unavailable. "
+                    "Use prompt-based generation (/v1/generation/prompt) instead."
+                ),
+            )
+        return _get_sdv()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"SDV unavailable: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Dataset replication (SDV) is temporarily unavailable. "
+                "Use prompt-based generation (/v1/generation/prompt) instead."
+            ),
+        )
 
 # Temporary storage for uploaded datasets
 UPLOAD_DIR = Path(settings.LOCAL_ARTIFACTS_DIR) / "uploads"
@@ -35,7 +52,11 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 async def replicate_dataset_task(job_id: str, dataset_id: str, config: ReplicationConfig):
     """Background task for dataset replication"""
     job_manager = get_job_manager()
-    sdv = get_sdv_replicator()
+    try:
+        sdv = get_sdv_replicator()
+    except HTTPException as e:
+        job_manager.fail_job(job_id, e.detail)
+        return
 
     try:
         job_manager.start_job(job_id)
